@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request, Response, status
@@ -12,6 +13,25 @@ from .schemas import Match, NameInput, ResultInput, Season, StandingsRow, Team
 
 MIN_TEAMS = 2
 
+DEFAULT_CORS_ORIGINS = ",".join(
+    (
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    )
+)
+
+
+def allowed_origins() -> list[str]:
+    """Browser origins allowed to call this API.
+
+    Defaults to the Vite dev and preview ports; set CORS_ORIGINS to a
+    comma-separated list when the frontend is served from anywhere else.
+    """
+    raw = os.getenv("CORS_ORIGINS", DEFAULT_CORS_ORIGINS)
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -23,7 +43,7 @@ app = FastAPI(title="LeagueTable API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=allowed_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )

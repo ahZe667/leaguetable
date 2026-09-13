@@ -36,10 +36,12 @@ Both settings have working defaults, so nothing is required for local use.
 | Variable | Used by | Default |
 | --- | --- | --- |
 | `DATABASE_URL` | backend | `sqlite:///./leaguetable.db` |
+| `CORS_ORIGINS` | backend | the Vite dev and preview ports on localhost |
 | `VITE_API_URL` | frontend | `http://localhost:8000` |
 
 The backend talks to the database through SQLAlchemy only, so pointing
-`DATABASE_URL` at PostgreSQL needs no code change.
+`DATABASE_URL` at PostgreSQL needs no code change. Serving the frontend from any
+other origin needs that origin in `CORS_ORIGINS`, as a comma-separated list.
 
 ## Tests
 
@@ -47,5 +49,6 @@ The backend talks to the database through SQLAlchemy only, so pointing
 cd backend && uv run pytest
 ```
 
-Thirty four tests cover the endpoints, the round-robin generator, the standings
-maths and persistence, each against a throwaway in-memory SQLite database.
+Thirty nine tests cover the endpoints, the round-robin generator, the standings
+maths, persistence and the CORS configuration. Each one runs against a throwaway
+in-memory SQLite database.

@@ -5,6 +5,7 @@ swapped by changing DATABASE_URL.
 """
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .errors import ConflictError, NotFoundError
@@ -28,13 +29,22 @@ class SqlStore:
         return Season.model_validate(row)
 
     def create_season(self, name: str) -> Season:
-        exists = self.session.scalar(select(SeasonRow).where(SeasonRow.name == name))
-        if exists is not None:
-            raise ConflictError(f"Season {name!r} already exists")
         row = SeasonRow(name=name)
         self.session.add(row)
-        self.session.commit()
+        self._commit_unique(row, f"Season {name!r} already exists")
         return Season.model_validate(row)
+
+    def _commit_unique(self, row: object, message: str) -> None:
+        """Commit an insert whose uniqueness the database enforces.
+
+        Checking first and inserting afterwards would let two concurrent
+        requests past the check, so the constraint is the single arbiter.
+        """
+        try:
+            self.session.commit()
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise ConflictError(message) from exc
 
     # teams -------------------------------------------------------------
     def list_teams(self, season_id: int) -> list[Team]:
@@ -48,14 +58,9 @@ class SqlStore:
         self.get_season(season_id)
         if self._season_has_matches(season_id):
             raise ConflictError("Clear the fixtures before changing the teams")
-        exists = self.session.scalar(
-            select(TeamRow).where(TeamRow.season_id == season_id, TeamRow.name == name)
-        )
-        if exists is not None:
-            raise ConflictError(f"Team {name!r} is already in this season")
         row = TeamRow(season_id=season_id, name=name)
         self.session.add(row)
-        self.session.commit()
+        self._commit_unique(row, f"Team {name!r} is already in this season")
         return Team.model_validate(row)
 
     def delete_team(self, team_id: int) -> None:

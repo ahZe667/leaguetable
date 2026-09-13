@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import * as api from './api'
 import Fixtures from './components/Fixtures.jsx'
@@ -22,10 +22,15 @@ export default function App() {
 
   const report = useCallback((cause) => setError(cause.message), [])
 
+  // Holds the season the user is looking at right now, so a slow response for a
+  // season they have already left is discarded instead of overwriting the view.
+  const selectedSeason = useRef(null)
+
   const refresh = useCallback(
     (id) =>
       Promise.all([api.listTeams(id), api.listMatches(id), api.getStandings(id)])
         .then(([nextTeams, nextMatches, nextStandings]) => {
+          if (selectedSeason.current !== id) return
           setTeams(nextTeams)
           setMatches(nextMatches)
           setStandings(nextStandings)
@@ -45,6 +50,7 @@ export default function App() {
   }, [report])
 
   useEffect(() => {
+    selectedSeason.current = seasonId
     if (seasonId === null) return
     refresh(seasonId)
   }, [seasonId, refresh])

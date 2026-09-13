@@ -74,7 +74,16 @@ export default function Fixtures({ matches, teams, onSave, onClear }) {
             .filter((match) => match.round === round)
             .map((match) => (
               <MatchRow
-                key={match.id}
+                // Match ids are reused after the schedule is cleared, so the key
+                // carries the stored fixture: any change remounts the row and
+                // reseeds its inputs from the server.
+                key={[
+                  match.id,
+                  match.home_team_id,
+                  match.away_team_id,
+                  match.home_score,
+                  match.away_score,
+                ].join(':')}
                 match={match}
                 nameOf={nameOf}
                 onSave={onSave}
