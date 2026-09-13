@@ -1,0 +1,247 @@
+openapi: 3.1.0
+info:
+  title: LeagueTable API
+  version: 1.0.0
+  description: >
+    Seasons, teams, round-robin fixtures and computed standings for one amateur
+    sports league. Scoring is three points for a win and one for a draw.
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+paths:
+  /api/seasons:
+    get:
+      summary: List seasons
+      operationId: listSeasons
+      responses:
+        "200":
+          description: Seasons, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Season" }
+    post:
+      summary: Create a season
+      operationId: createSeason
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NameInput" }
+      responses:
+        "201":
+          description: The created season
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Season" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/seasons/{seasonId}/teams:
+    parameters:
+      - $ref: "#/components/parameters/SeasonId"
+    get:
+      summary: List the teams of a season
+      operationId: listTeams
+      responses:
+        "200":
+          description: Teams ordered by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Team" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Add a team to a season
+      operationId: addTeam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NameInput" }
+      responses:
+        "201":
+          description: The created team
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Team" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/teams/{teamId}:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema: { type: integer }
+    delete:
+      summary: Remove a team
+      description: Refused while the season already has fixtures.
+      operationId: deleteTeam
+      responses:
+        "204": { description: Removed }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/seasons/{seasonId}/fixtures:
+    parameters:
+      - $ref: "#/components/parameters/SeasonId"
+    post:
+      summary: Generate a single round-robin schedule
+      description: >
+        Replaces any existing schedule for the season and clears every result.
+        An odd number of teams gives one bye per round.
+      operationId: generateFixtures
+      responses:
+        "201":
+          description: The generated matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Match" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/seasons/{seasonId}/matches:
+    parameters:
+      - $ref: "#/components/parameters/SeasonId"
+    get:
+      summary: List the matches of a season
+      operationId: listMatches
+      responses:
+        "200":
+          description: Matches ordered by round
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Match" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/matches/{matchId}/result:
+    parameters:
+      - name: matchId
+        in: path
+        required: true
+        schema: { type: integer }
+    put:
+      summary: Set or clear the result of a match
+      description: Sending null for both scores returns the match to not played.
+      operationId: setResult
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResultInput" }
+      responses:
+        "200":
+          description: The updated match
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Match" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Invalid scores }
+
+  /api/seasons/{seasonId}/standings:
+    parameters:
+      - $ref: "#/components/parameters/SeasonId"
+    get:
+      summary: Standings computed from played matches
+      operationId: getStandings
+      responses:
+        "200":
+          description: Ordered by points, goal difference, goals for, then name
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StandingsRow" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  parameters:
+    SeasonId:
+      name: seasonId
+      in: path
+      required: true
+      schema: { type: integer }
+
+  responses:
+    NotFound:
+      description: The resource does not exist
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: The request clashes with the current state
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+
+    NameInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+
+    ResultInput:
+      type: object
+      required: [home_score, away_score]
+      properties:
+        home_score: { type: [integer, "null"], minimum: 0 }
+        away_score: { type: [integer, "null"], minimum: 0 }
+
+    Season:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+
+    Team:
+      type: object
+      required: [id, season_id, name]
+      properties:
+        id: { type: integer }
+        season_id: { type: integer }
+        name: { type: string }
+
+    Match:
+      type: object
+      required:
+        [id, season_id, round, home_team_id, away_team_id, home_score, away_score]
+      properties:
+        id: { type: integer }
+        season_id: { type: integer }
+        round: { type: integer, minimum: 1 }
+        home_team_id: { type: integer }
+        away_team_id: { type: integer }
+        home_score: { type: [integer, "null"], minimum: 0 }
+        away_score: { type: [integer, "null"], minimum: 0 }
+
+    StandingsRow:
+      type: object
+      required:
+        [team_id, team_name, played, won, drawn, lost, goals_for, goals_against,
+         goal_difference, points]
+      properties:
+        team_id: { type: integer }
+        team_name: { type: string }
+        played: { type: integer }
+        won: { type: integer }
+        drawn: { type: integer }
+        lost: { type: integer }
+        goals_for: { type: integer }
+        goals_against: { type: integer }
+        goal_difference: { type: integer }
+        points: { type: integer }
