@@ -1,98 +1,107 @@
-"""In-memory store standing in for the database.
+"""Persistence for the league, backed by SQLAlchemy.
 
-Replaced by a SQLAlchemy-backed implementation with the same interface.
+The API layer only ever sees the pydantic schemas, so the storage engine can be
+swapped by changing DATABASE_URL.
 """
 
-from itertools import count
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
 
 from .errors import ConflictError, NotFoundError
+from .models import MatchRow, SeasonRow, TeamRow
 from .schemas import Match, Season, Team
 
 
-class InMemoryStore:
-    def __init__(self) -> None:
-        self._ids = count(1)
-        self._seasons: dict[int, Season] = {}
-        self._teams: dict[int, Team] = {}
-        self._matches: dict[int, Match] = {}
-
-    def _next_id(self) -> int:
-        return next(self._ids)
+class SqlStore:
+    def __init__(self, session: Session) -> None:
+        self.session = session
 
     # seasons -----------------------------------------------------------
     def list_seasons(self) -> list[Season]:
-        return sorted(self._seasons.values(), key=lambda season: season.id)
+        rows = self.session.scalars(select(SeasonRow).order_by(SeasonRow.id)).all()
+        return [Season.model_validate(row) for row in rows]
 
     def get_season(self, season_id: int) -> Season:
-        season = self._seasons.get(season_id)
-        if season is None:
+        row = self.session.get(SeasonRow, season_id)
+        if row is None:
             raise NotFoundError(f"Season {season_id} not found")
-        return season
+        return Season.model_validate(row)
 
     def create_season(self, name: str) -> Season:
-        if any(season.name == name for season in self._seasons.values()):
+        exists = self.session.scalar(select(SeasonRow).where(SeasonRow.name == name))
+        if exists is not None:
             raise ConflictError(f"Season {name!r} already exists")
-        season = Season(id=self._next_id(), name=name)
-        self._seasons[season.id] = season
-        return season
+        row = SeasonRow(name=name)
+        self.session.add(row)
+        self.session.commit()
+        return Season.model_validate(row)
 
     # teams -------------------------------------------------------------
     def list_teams(self, season_id: int) -> list[Team]:
         self.get_season(season_id)
-        teams = [team for team in self._teams.values() if team.season_id == season_id]
-        return sorted(teams, key=lambda team: team.name)
+        rows = self.session.scalars(
+            select(TeamRow).where(TeamRow.season_id == season_id).order_by(TeamRow.name)
+        ).all()
+        return [Team.model_validate(row) for row in rows]
 
     def add_team(self, season_id: int, name: str) -> Team:
         self.get_season(season_id)
-        clash = any(
-            team.season_id == season_id and team.name == name for team in self._teams.values()
+        exists = self.session.scalar(
+            select(TeamRow).where(TeamRow.season_id == season_id, TeamRow.name == name)
         )
-        if clash:
+        if exists is not None:
             raise ConflictError(f"Team {name!r} is already in this season")
-        team = Team(id=self._next_id(), season_id=season_id, name=name)
-        self._teams[team.id] = team
-        return team
+        row = TeamRow(season_id=season_id, name=name)
+        self.session.add(row)
+        self.session.commit()
+        return Team.model_validate(row)
 
     def delete_team(self, team_id: int) -> None:
-        team = self._teams.get(team_id)
-        if team is None:
+        row = self.session.get(TeamRow, team_id)
+        if row is None:
             raise NotFoundError(f"Team {team_id} not found")
-        if self._season_has_matches(team.season_id):
+        if self._season_has_matches(row.season_id):
             raise ConflictError("Remove the fixtures before changing the teams")
-        del self._teams[team_id]
+        self.session.delete(row)
+        self.session.commit()
 
     def _season_has_matches(self, season_id: int) -> bool:
-        return any(match.season_id == season_id for match in self._matches.values())
+        found = self.session.scalar(select(MatchRow.id).where(MatchRow.season_id == season_id))
+        return found is not None
 
     # matches -----------------------------------------------------------
     def list_matches(self, season_id: int) -> list[Match]:
         self.get_season(season_id)
-        matches = [match for match in self._matches.values() if match.season_id == season_id]
-        return sorted(matches, key=lambda match: (match.round, match.id))
+        rows = self.session.scalars(
+            select(MatchRow)
+            .where(MatchRow.season_id == season_id)
+            .order_by(MatchRow.round, MatchRow.id)
+        ).all()
+        return [Match.model_validate(row) for row in rows]
 
     def replace_fixtures(
         self, season_id: int, rounds: list[list[tuple[int, int]]]
     ) -> list[Match]:
         self.get_season(season_id)
-        self._matches = {
-            key: match for key, match in self._matches.items() if match.season_id != season_id
-        }
-        for index, pairs in enumerate(rounds, start=1):
-            for home_id, away_id in pairs:
-                match = Match(
-                    id=self._next_id(),
-                    season_id=season_id,
-                    round=index,
-                    home_team_id=home_id,
-                    away_team_id=away_id,
-                )
-                self._matches[match.id] = match
+        self.session.execute(delete(MatchRow).where(MatchRow.season_id == season_id))
+        self.session.add_all(
+            MatchRow(
+                season_id=season_id,
+                round=index,
+                home_team_id=home_id,
+                away_team_id=away_id,
+            )
+            for index, pairs in enumerate(rounds, start=1)
+            for home_id, away_id in pairs
+        )
+        self.session.commit()
         return self.list_matches(season_id)
 
     def set_result(self, match_id: int, home_score: int | None, away_score: int | None) -> Match:
-        match = self._matches.get(match_id)
-        if match is None:
+        row = self.session.get(MatchRow, match_id)
+        if row is None:
             raise NotFoundError(f"Match {match_id} not found")
-        match.home_score = home_score
-        match.away_score = away_score
-        return match
+        row.home_score = home_score
+        row.away_score = away_score
+        self.session.commit()
+        return Match.model_validate(row)

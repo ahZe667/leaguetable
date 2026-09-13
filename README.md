@@ -29,8 +29,23 @@ npm run dev
 The frontend runs on http://localhost:5173 and talks to the backend on
 http://localhost:8000.
 
+## Configuration
+
+Both settings have working defaults, so nothing is required for local use.
+
+| Variable | Used by | Default |
+| --- | --- | --- |
+| `DATABASE_URL` | backend | `sqlite:///./leaguetable.db` |
+| `VITE_API_URL` | frontend | `http://localhost:8000` |
+
+The backend talks to the database through SQLAlchemy only, so pointing
+`DATABASE_URL` at PostgreSQL needs no code change.
+
 ## Tests
 
 ```bash
 cd backend && uv run pytest
 ```
+
+Thirty tests cover the endpoints, the round-robin generator, the standings
+maths and persistence, each against a throwaway in-memory SQLite database.

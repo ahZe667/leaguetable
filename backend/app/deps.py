@@ -1,7 +1,9 @@
-from .store import InMemoryStore
+from collections.abc import Iterator
 
-_store = InMemoryStore()
+from .db import SessionLocal
+from .store import SqlStore
 
 
-def get_store() -> InMemoryStore:
-    return _store
+def get_store() -> Iterator[SqlStore]:
+    with SessionLocal() as session:
+        yield SqlStore(session)

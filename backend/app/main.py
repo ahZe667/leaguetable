@@ -1,7 +1,10 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .db import init_db
 from .deps import get_store
 from .errors import ConflictError, NotFoundError
 from .league import compute_standings, round_robin
@@ -9,7 +12,14 @@ from .schemas import Match, NameInput, ResultInput, Season, StandingsRow, Team
 
 MIN_TEAMS = 2
 
-app = FastAPI(title="LeagueTable API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="LeagueTable API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
