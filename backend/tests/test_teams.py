@@ -39,3 +39,23 @@ def test_cannot_delete_a_team_once_fixtures_exist(client, season):
     teams = add_teams(client, season["id"], ["Arrows FC", "Beacon United"])
     client.post(f"/api/seasons/{season['id']}/fixtures")
     assert client.delete(f"/api/teams/{teams[0]['id']}").status_code == 409
+
+
+def test_cannot_add_a_team_once_fixtures_exist(client, season):
+    add_teams(client, season["id"], ["Arrows FC", "Beacon United"])
+    client.post(f"/api/seasons/{season['id']}/fixtures")
+    late = client.post(f"/api/seasons/{season['id']}/teams", json={"name": "Latecomer"})
+    assert late.status_code == 409
+    assert len(client.get(f"/api/seasons/{season['id']}/teams").json()) == 2
+
+
+def test_clearing_fixtures_unlocks_the_team_list(client, season):
+    teams = add_teams(client, season["id"], ["Arrows FC", "Beacon United"])
+    client.post(f"/api/seasons/{season['id']}/fixtures")
+
+    assert client.delete(f"/api/seasons/{season['id']}/fixtures").status_code == 204
+    assert client.get(f"/api/seasons/{season['id']}/matches").json() == []
+    assert client.post(
+        f"/api/seasons/{season['id']}/teams", json={"name": "Latecomer"}
+    ).status_code == 201
+    assert client.delete(f"/api/teams/{teams[0]['id']}").status_code == 204

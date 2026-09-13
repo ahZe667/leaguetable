@@ -64,6 +64,7 @@ automatically.
 | POST | `/api/seasons/{id}/teams` | Add a team |
 | DELETE | `/api/teams/{id}` | Remove a team |
 | POST | `/api/seasons/{id}/fixtures` | Generate the round-robin schedule |
+| DELETE | `/api/seasons/{id}/fixtures` | Clear the schedule |
 | GET | `/api/seasons/{id}/matches` | List matches, ordered by round |
 | PUT | `/api/matches/{id}/result` | Set or clear a result |
 | GET | `/api/seasons/{id}/standings` | Computed table |

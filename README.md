@@ -47,5 +47,5 @@ The backend talks to the database through SQLAlchemy only, so pointing
 cd backend && uv run pytest
 ```
 
-Thirty tests cover the endpoints, the round-robin generator, the standings
+Thirty four tests cover the endpoints, the round-robin generator, the standings
 maths and persistence, each against a throwaway in-memory SQLite database.

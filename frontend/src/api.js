@@ -50,6 +50,10 @@ export function generateFixtures(seasonId) {
   return request(`/api/seasons/${seasonId}/fixtures`, { method: 'POST' })
 }
 
+export function clearFixtures(seasonId) {
+  return request(`/api/seasons/${seasonId}/fixtures`, { method: 'DELETE' })
+}
+
 export function listMatches(seasonId) {
   return request(`/api/seasons/${seasonId}/matches`)
 }

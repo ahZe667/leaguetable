@@ -134,6 +134,7 @@ export default function App() {
               onAdd={(name) => run(() => api.addTeam(seasonId, name))}
               onRemove={(id) => run(() => api.deleteTeam(id))}
               onGenerate={() => run(() => api.generateFixtures(seasonId))}
+              onClearFixtures={() => run(() => api.clearFixtures(seasonId))}
             />
           )}
         </>

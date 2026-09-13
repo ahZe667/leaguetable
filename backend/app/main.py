@@ -79,6 +79,12 @@ def generate_fixtures(season_id: int, store=Depends(get_store)):
     return store.replace_fixtures(season_id, round_robin([team.id for team in teams]))
 
 
+@app.delete("/api/seasons/{season_id}/fixtures", status_code=status.HTTP_204_NO_CONTENT)
+def clear_fixtures(season_id: int, store=Depends(get_store)) -> Response:
+    store.clear_fixtures(season_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.get("/api/seasons/{season_id}/matches", response_model=list[Match])
 def list_matches(season_id: int, store=Depends(get_store)):
     return store.list_matches(season_id)

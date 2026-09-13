@@ -31,6 +31,11 @@ def test_half_filled_and_negative_results_are_rejected(client, season):
     assert negative.status_code == 422
 
 
+def test_both_scores_must_be_sent(client, season):
+    match = prepared(client, season)[0]
+    assert client.put(f"/api/matches/{match['id']}/result", json={}).status_code == 422
+
+
 def test_result_for_unknown_match_is_not_found(client):
     assert (
         client.put("/api/matches/999/result", json={"home_score": 1, "away_score": 0}).status_code

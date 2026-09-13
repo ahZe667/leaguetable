@@ -27,10 +27,6 @@ class Match(BaseModel):
     home_score: int | None = Field(default=None, ge=0)
     away_score: int | None = Field(default=None, ge=0)
 
-    @property
-    def played(self) -> bool:
-        return self.home_score is not None and self.away_score is not None
-
 
 class StandingsRow(BaseModel):
     team_id: int
@@ -61,8 +57,10 @@ class NameInput(BaseModel):
 
 
 class ResultInput(BaseModel):
-    home_score: int | None = Field(default=None, ge=0)
-    away_score: int | None = Field(default=None, ge=0)
+    """Both scores are required. Sending null for both clears the result."""
+
+    home_score: int | None = Field(ge=0)
+    away_score: int | None = Field(ge=0)
 
     @model_validator(mode="after")
     def _both_or_neither(self):

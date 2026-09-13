@@ -51,6 +51,10 @@ def test_generating_again_replaces_the_schedule_and_clears_results(client, seaso
     assert client.get(f"/api/seasons/{season['id']}/standings").json()[0]["played"] == 0
 
 
+def test_clearing_fixtures_of_an_unknown_season_is_not_found(client):
+    assert client.delete("/api/seasons/999/fixtures").status_code == 404
+
+
 def test_fixtures_need_at_least_two_teams(client, season):
     add_teams(client, season["id"], ["Arrows FC"])
     assert client.post(f"/api/seasons/{season['id']}/fixtures").status_code == 409

@@ -46,6 +46,8 @@ class SqlStore:
 
     def add_team(self, season_id: int, name: str) -> Team:
         self.get_season(season_id)
+        if self._season_has_matches(season_id):
+            raise ConflictError("Clear the fixtures before changing the teams")
         exists = self.session.scalar(
             select(TeamRow).where(TeamRow.season_id == season_id, TeamRow.name == name)
         )
@@ -61,7 +63,7 @@ class SqlStore:
         if row is None:
             raise NotFoundError(f"Team {team_id} not found")
         if self._season_has_matches(row.season_id):
-            raise ConflictError("Remove the fixtures before changing the teams")
+            raise ConflictError("Clear the fixtures before changing the teams")
         self.session.delete(row)
         self.session.commit()
 
@@ -96,6 +98,11 @@ class SqlStore:
         )
         self.session.commit()
         return self.list_matches(season_id)
+
+    def clear_fixtures(self, season_id: int) -> None:
+        self.get_season(season_id)
+        self.session.execute(delete(MatchRow).where(MatchRow.season_id == season_id))
+        self.session.commit()
 
     def set_result(self, match_id: int, home_score: int | None, away_score: int | None) -> Match:
         row = self.session.get(MatchRow, match_id)
